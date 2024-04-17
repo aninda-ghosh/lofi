@@ -15,21 +15,24 @@ class PretrainImageEncoder(pl.LightningModule):
         super(PretrainImageEncoder, self).__init__()
 
         self.cfg = cfg
-        self.model = ImageEncoder(image_size=cfg.image_size, num_channels=cfg.num_channels, pretrain=True)
-        self.num_patches = (self.model.config.image_size // self.model.config.patch_size) ** 2
+        self.model = ImageEncoder(image_size=cfg.IMAGE.SIZE, num_channels=cfg.IMAGE.CHANNELS, pretrain=True)
+        self.num_patches = (self.model.swinModel.config.image_size // self.model.swinModel.config.patch_size) ** 2
         self.optimizer = torch.optim.AdamW(self.model.parameters(), lr=cfg.TRAINING.LEARNING_RATE, weight_decay=cfg.TRAINING.WEIGHT_DECAY)
 
+    def configure_optimizers(self):
+        return self.optimizer
 
-    def forward(self, image):
-        mask_positions = torch.randint(low=0, high=2, size=(1, self.num_patches)).bool()
+    def forward(self, image, batch_size):
+        mask_positions = torch.randint(low=0, high=2, size=(batch_size, self.num_patches)).bool()
+        mask_positions = mask_positions.to(self.device)
         outputs = self.model(pixel_values= image, bool_masked_pos=mask_positions)
-        loss, reconstructed_pixel_values = outputs.loss, outputs.reconstruction
+        loss, reconstructed_pixel_values = outputs[0], outputs[1]
         return loss, reconstructed_pixel_values
     
     def training_step(self, batch, batch_idx):
         image = batch
         
-        loss, _ = self.model(image)
+        loss, _ = self(image, batch.shape[0])
 
         self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
@@ -37,7 +40,7 @@ class PretrainImageEncoder(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
         image = batch
         
-        loss, _ = self.model(image)
+        loss, _ = self(image, batch.shape[0])
 
         self.log("val_loss", loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
@@ -47,8 +50,11 @@ if __name__ == "__main__":
     pl.seed_everything(cfg.MODEL.SEED_VALUE, workers=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print('Device: {}'.format(device))
+    #get the number of available GPUs and devices ids
+    num_gpus = torch.cuda.device_count()
+    print(f"Number of GPUs available: {num_gpus}")
     
+
     torch.set_float32_matmul_precision('medium')
 
     # Initialize the dataset and dataloaders
@@ -70,7 +76,8 @@ if __name__ == "__main__":
         max_epochs=cfg.TRAINING.MAX_EPOCHS,
         deterministic=True,
         num_sanity_val_steps=0,
-        callbacks=[StochasticWeightAveraging(swa_lrs=cfg.TRAINING.SWA_LRS)]
+        callbacks=[StochasticWeightAveraging(swa_lrs=cfg.TRAINING.SWA_LRS)], 
+        default_root_dir="/data/hkerner/NASA-MLCommons/lofi"
     )
 
     trainer.fit(model, train_dataloaders=train_dataloader, val_dataloaders=val_dataloader)
