@@ -1,6 +1,7 @@
 from torch import nn
 from transformers import SwinModel, SwinConfig
 import math
+import torch
 
 class ImageEncoder(nn.Module):
     def __init__(self, image_size, num_channels, pretrain=True):
