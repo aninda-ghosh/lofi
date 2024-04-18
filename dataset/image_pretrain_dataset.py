@@ -9,22 +9,20 @@ from tqdm import tqdm
 import rasterio
 import numpy as np
 
-class LoFiDataset(Dataset):
+class PretrainDataset(Dataset):
     def __init__(self, dataset_path, transform=None):
         #read all the csv in the directory
-        df_paths = glob.glob(dataset_path + "/*.csv")
-
+        df = pd.read_csv(dataset_path)
+        
         self.image_patches_count = 0
 
         self.harvest_image_paths = []
         self.planting_image_paths = []
 
-        for df_path in tqdm(df_paths):
-            df = pd.read_csv(df_path)
-            for index, row in df.iterrows():
-                self.harvest_image_paths.append(row['harvest_image_path'])
-                self.planting_image_paths.append(row['planting_image_path'])
-                self.image_patches_count += 1
+        for index, row in df.iterrows():
+            self.harvest_image_paths.append(row['harvest_image_path'])
+            self.planting_image_paths.append(row['planting_image_path'])
+            self.image_patches_count += 1
 
     def __len__(self):
         return self.image_patches_count

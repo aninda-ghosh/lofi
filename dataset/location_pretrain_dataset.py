@@ -9,22 +9,22 @@ from tqdm import tqdm
 import rasterio
 import numpy as np
 
-class LoFiDataset(Dataset):
+class LocationPretrainDataset(Dataset):
     def __init__(self, dataset_path, transform=None):
         #read all the csv in the directory
-        df_paths = glob.glob(dataset_path + "/*.csv")
-
+        df = pd.read_csv(dataset_path)
+        
         self.image_patches_count = 0
 
         self.harvest_image_paths = []
         self.planting_image_paths = []
+        self.location = []
 
-        for df_path in tqdm(df_paths):
-            df = pd.read_csv(df_path)
-            for index, row in df.iterrows():
-                self.harvest_image_paths.append(row['harvest_image_path'])
-                self.planting_image_paths.append(row['planting_image_path'])
-                self.image_patches_count += 1
+        for index, row in df.iterrows():
+            self.harvest_image_paths.append(row['harvest_image_path'])
+            self.planting_image_paths.append(row['planting_image_path'])
+            self.location.append([row['centroid_latitude'], row['centroid_longitude']])
+            self.image_patches_count += 1
 
     def __len__(self):
         return self.image_patches_count
@@ -47,4 +47,5 @@ class LoFiDataset(Dataset):
         image = np.stack([harvest_data, planting_data], axis=0)
         image = image.reshape(6, image.shape[2], image.shape[3]).astype(np.float32)
         pixel_values = torch.tensor(image, dtype=torch.float32) / 127.5 - 1.0
-        return pixel_values
+        location = torch.tensor(self.location[index], dtype=torch.float32)
+        return pixel_values, location

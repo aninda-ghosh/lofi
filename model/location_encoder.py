@@ -5,16 +5,17 @@ from model.equal_earth_projection import equal_earth_projection
 from model.random_fourier_features import GaussianEncoding
 
 class LocationEncoderSingleFourierLayer(nn.Module):
-    def __init__(self, sigma):
+    def __init__(self, sigma, embedding_size):
         super(LocationEncoderSingleFourierLayer, self).__init__()
-        self.fourier_encoding = GaussianEncoding(sigma=sigma, input_size=2, encoded_size=256)
-        self.linear1 = nn.Linear(512, 1024)
+        self.embedding_size = embedding_size
+        self.fourier_encoding = GaussianEncoding(sigma=sigma, input_size=2, encoded_size=self.embedding_size//2)
+        self.linear1 = nn.Linear(self.embedding_size, 1024)
         self.activ1 = nn.ReLU()
         self.linear2 = nn.Linear(1024, 1024)
         self.activ2 = nn.ReLU()
         self.linear3 = nn.Linear(1024, 1024)
         self.activ3 = nn.ReLU()
-        self.head = nn.Sequential(nn.Linear(1024, 512))
+        self.head = nn.Sequential(nn.Linear(1024, self.embedding_size))
 
     def forward(self, x):
         x = self.fourier_encoding(x)
@@ -26,17 +27,18 @@ class LocationEncoderSingleFourierLayer(nn.Module):
     
 
 class LocationEncoder(nn.Module):
-    def __init__(self, sigma=[2**0, 2**4, 2**8]):
+    def __init__(self, embedding_size, sigma=[2**0, 2**4, 2**8]):
         super(LocationEncoder, self).__init__()
         self.sigma = sigma
+        self.embedding_size = embedding_size
         self.num_layers = len(self.sigma)
 
         for i, s in enumerate(self.sigma):
-            self.add_module('LocationEncoderLayer' + str(i), LocationEncoderSingleFourierLayer(sigma=s))
+            self.add_module('LocationEncoderLayer' + str(i), LocationEncoderSingleFourierLayer(sigma=s, embedding_size=self.embedding_size))
 
     def forward(self, location):
         location = equal_earth_projection(location)
-        location_features = torch.zeros(location.shape[0], 512).to(location.device)
+        location_features = torch.zeros(location.shape[0], self.embedding_size).to(location.device)
 
         for i in range(self.num_layers):
             location_features += self._modules['LocationEncoderLayer' + str(i)](location)
