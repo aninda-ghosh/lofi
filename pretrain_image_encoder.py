@@ -18,13 +18,7 @@ class PretrainImageEncoder(pl.LightningModule):
         self.cfg = cfg
         self.image_encoder = ImageEncoder(image_size=cfg.DATA.IMAGE.SIZE, num_channels=cfg.DATA.IMAGE.CHANNELS)
 
-        num_features = int(self.image_encoder.swinConfig.embed_dim * 2 ** (self.image_encoder.swinConfig.num_layers - 1))
-        self.decoder = nn.Sequential(
-            nn.Conv2d(
-                in_channels=num_features, out_channels=self.image_encoder.swinConfig.encoder_stride**2 * self.image_encoder.swinConfig.num_channels, kernel_size=1
-            ),
-            nn.PixelShuffle(self.image_encoder.swinConfig.encoder_stride)
-        )
+        
 
         self.num_patches = (self.image_encoder.swinModel.config.image_size // self.image_encoder.swinModel.config.patch_size) ** 2
         self.optimizer = torch.optim.AdamW(self.parameters(), lr=cfg.MODEL.SSL.TRAINING.LEARNING_RATE, weight_decay=cfg.MODEL.SSL.TRAINING.WEIGHT_DECAY)
