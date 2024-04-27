@@ -27,14 +27,19 @@ class LocationEncoderSingleFourierLayer(nn.Module):
     
 
 class LocationEncoder(nn.Module):
-    def __init__(self, embedding_size, sigma=[2**0, 2**4, 2**8]):
+    def __init__(self, embedding_size, sigma=[2**0, 2**4, 2**8], freeze=False):
         super(LocationEncoder, self).__init__()
         self.sigma = sigma
         self.embedding_size = embedding_size
         self.num_layers = len(self.sigma)
+        self.freeze = freeze
 
         for i, s in enumerate(self.sigma):
             self.add_module('LocationEncoderLayer' + str(i), LocationEncoderSingleFourierLayer(sigma=s, embedding_size=self.embedding_size))
+
+        if self.freeze:
+            for param in self.parameters():
+                param.requires_grad = False
 
     def forward(self, location):
         location = equal_earth_projection(location)
